@@ -6,11 +6,23 @@ import {
   getBoundTextElement,
   getCommonBounds,
   isArrowElement,
+  LinearElementEditor,
   newElementWith,
 } from "@excalidraw/element";
 
+import {
+  isLabelFollowingPath,
+  LABEL_FOLLOWS_PATH_CUSTOM_DATA_KEY,
+} from "@excalidraw/element/curvedLabel";
+import {
+  getClearLabelOffset,
+  getLabelOffset,
+  LABEL_OFFSET_CUSTOM_DATA_KEY,
+} from "@excalidraw/element/labelOffset";
+
 import type {
   ExcalidrawElement,
+  ExcalidrawTextElementWithContainer,
   NonDeletedExcalidrawElement,
 } from "@excalidraw/element/types";
 
@@ -22,7 +34,7 @@ import {
 import { useUIAppState } from "../context/ui-appState";
 
 import { AnimationPreviewDialog } from "./AnimationPreviewDialog";
-import { createAnimationDot, getAnimationDot } from "./dot";
+import { createAnimationDot, getAnimationDots, getTravelStart } from "./dot";
 import { DIRECTION_LABELS, STRINGS, TYPE_LABELS } from "./strings";
 import {
   ANIMATION_DIRECTIONS,
@@ -48,9 +60,12 @@ type Item = {
   element: AnimatableElement;
   label: string;
   animation: ElementAnimation | null;
-  /** for `dot` animations: the dot element, null if it was deleted */
-  dot: NonDeletedExcalidrawElement | null;
+  /** for `dot` animations: the dot elements that still exist */
+  dots: NonDeletedExcalidrawElement[];
+  labelElement: ExcalidrawTextElementWithContainer | null;
 };
+
+type LabelSide = "above" | "on" | "below";
 
 const LABEL_MAX_LENGTH = 32;
 
@@ -104,16 +119,20 @@ const AnimationItem = ({
   selected,
   onFocus,
   onChange,
-  onSelectDot,
+  onSelectDots,
+  onLabelSide,
+  onLabelFollowsPath,
 }: {
   item: Item;
   selected: boolean;
   onFocus: () => void;
-  onChange: (animation: ElementAnimation | null) => void;
-  onSelectDot: () => void;
+  onChange: (animation: ElementAnimation | null, dotCount?: number) => void;
+  onSelectDots: () => void;
+  onLabelSide: (side: LabelSide) => void;
+  onLabelFollowsPath: (follows: boolean) => void;
 }) => {
-  const { element, label, animation, dot } = item;
-  const isDotMissing = animation?.type === "dot" && !dot;
+  const { element, label, animation, dots } = item;
+  const isDotMissing = animation?.type === "dot" && !dots.length;
 
   const setType = (type: ElementAnimationType | "none") => {
     if (type === "none") {
@@ -127,6 +146,9 @@ const AnimationItem = ({
               direction: animation.direction,
               dashLength: animation.dashLength,
               gapLength: animation.gapLength,
+              ...(type === "dot" && animation.sequence
+                ? { sequence: animation.sequence }
+                : {}),
             }
           : {}),
       });
@@ -215,27 +237,90 @@ const AnimationItem = ({
               />
             </>
           )}
-          {animation.type === "dot" &&
-            (dot ? (
-              <button
-                type="button"
-                className="animation-menu__secondary animation-menu__wide"
-                onClick={onSelectDot}
-              >
-                {STRINGS.selectDot}
-              </button>
-            ) : (
-              <div className="animation-menu__wide animation-menu__warning">
-                <span>{STRINGS.dotMissing}</span>
+          {animation.type === "dot" && (
+            <>
+              <NumberField
+                label={STRINGS.dotCount}
+                value={Math.max(1, dots.length)}
+                limits={ANIMATION_LIMITS.dotCount}
+                onCommit={(count) => onChange(animation, count)}
+              />
+              {dots.length ? (
                 <button
                   type="button"
-                  className="animation-menu__secondary"
-                  onClick={() => onChange({ ...animation, dotId: undefined })}
+                  className="animation-menu__secondary animation-menu__wide"
+                  onClick={onSelectDots}
                 >
-                  {STRINGS.addDot}
+                  {dots.length > 1 ? STRINGS.selectDots : STRINGS.selectDot}
                 </button>
+              ) : (
+                <div className="animation-menu__wide animation-menu__warning">
+                  <span>{STRINGS.dotMissing}</span>
+                  <button
+                    type="button"
+                    className="animation-menu__secondary"
+                    onClick={() => onChange(animation, 1)}
+                  >
+                    {STRINGS.addDot}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          {(item.labelElement || animation.type === "dot") && (
+            // secondary settings, collapsed to keep the list scannable
+            <details className="animation-menu__more animation-menu__wide">
+              <summary>{STRINGS.moreOptions}</summary>
+              <div className="animation-menu__more-content">
+                {animation.type === "dot" && (
+                  <NumberField
+                    label={STRINGS.sequence}
+                    value={animation.sequence ?? 0}
+                    limits={ANIMATION_LIMITS.sequence}
+                    onCommit={(sequence) =>
+                      onChange({ ...animation, sequence: Math.round(sequence) })
+                    }
+                  />
+                )}
+                {item.labelElement && (
+                  <div className="animation-menu__field animation-menu__wide">
+                    <span>{STRINGS.labelPlacement}</span>
+                    <div className="animation-menu__segmented" role="group">
+                      {(["above", "on", "below"] as const).map((side) => {
+                        const offset = getLabelOffset(item.labelElement!);
+                        const current =
+                          offset < 0 ? "above" : offset > 0 ? "below" : "on";
+                        return (
+                          <button
+                            key={side}
+                            type="button"
+                            aria-pressed={current === side}
+                            className={clsx("animation-menu__filter", {
+                              "animation-menu__filter--active":
+                                current === side,
+                            })}
+                            onClick={() => onLabelSide(side)}
+                          >
+                            {STRINGS.labelSides[side]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <label className="animation-menu__checkbox">
+                      <input
+                        type="checkbox"
+                        checked={isLabelFollowingPath(item.labelElement)}
+                        onChange={(event) =>
+                          onLabelFollowsPath(event.target.checked)
+                        }
+                      />
+                      {STRINGS.labelFollowsPath}
+                    </label>
+                  </div>
+                )}
               </div>
-            ))}
+            </details>
+          )}
         </div>
       )}
     </li>
@@ -260,9 +345,8 @@ export const AnimationMenu = () => {
       }
       const kind = isArrowElement(element) ? "arrow" : "line";
       counters[kind]++;
-      const text = getBoundTextElement(element, elementsMap)
-        ?.text.replace(/\s+/g, " ")
-        .trim();
+      const labelElement = getBoundTextElement(element, elementsMap);
+      const text = labelElement?.text.replace(/\s+/g, " ").trim();
       result.push({
         element,
         label: text
@@ -271,18 +355,19 @@ export const AnimationMenu = () => {
             : text
           : `${STRINGS[kind]} ${counters[kind]}`,
         animation: getElementAnimation(element),
-        dot: getAnimationDot(element, elementsMap),
+        dots: getAnimationDots(element, elementsMap),
+        labelElement,
       });
     }
     return result;
   }, [elements, app]);
 
-  // selecting a line's dot on the canvas counts as selecting the line
+  // selecting one of a line's dots on the canvas counts as selecting the line
   const isSelected = (item: Item) =>
     !!selectedElementIds[item.element.id] ||
-    (!!item.dot && !!selectedElementIds[item.dot.id]);
+    item.dots.some((dot) => selectedElementIds[dot.id]);
   const isAnimated = (item: Item) =>
-    !!item.animation && (item.animation.type !== "dot" || !!item.dot);
+    !!item.animation && (item.animation.type !== "dot" || item.dots.length > 0);
 
   const visibleItems = items.filter((item) =>
     filter === "animated"
@@ -306,38 +391,55 @@ export const AnimationMenu = () => {
     item?.scrollIntoView?.({ block: "nearest" });
   }, [firstSelectedId]);
 
+  /**
+   * Applies `animation` to the line and, for moving dots, adds or removes dot
+   * elements to match `dotCount` (default: keep the current count, at least
+   * one). A single scene update, so one undo reverts line and dots together.
+   */
   const updateAnimation = (
     line: AnimatableElement,
     animation: ElementAnimation | null,
+    dotCount?: number,
   ) => {
     const elementsMap = app.scene.getNonDeletedElementsMap();
-    const currentDot = getAnimationDot(line, elementsMap);
+    const currentDots = getAnimationDots(line, elementsMap);
     let next = animation;
-    let dotToAdd: NonDeletedExcalidrawElement | null = null;
+    let dotsToAdd: NonDeletedExcalidrawElement[] = [];
+    let dotsToRemove: NonDeletedExcalidrawElement[] = currentDots;
+
     if (next?.type === "dot") {
-      if (currentDot) {
-        next = { ...next, dotId: currentDot.id };
-      } else {
-        dotToAdd = createAnimationDot(line, next.direction, elementsMap);
-        next = { ...next, dotId: dotToAdd.id };
-      }
+      const count = dotCount ?? Math.max(1, currentDots.length);
+      const kept = currentDots.slice(0, count);
+      dotsToRemove = currentDots.slice(count);
+      const direction = next.direction;
+      // spread along the line, styled like the first existing dot
+      dotsToAdd = Array.from({ length: count - kept.length }, (_, i) =>
+        createAnimationDot(
+          line,
+          direction,
+          elementsMap,
+          (kept.length + i) / count,
+          kept[0],
+        ),
+      );
+      next = { ...next, dotIds: [...kept, ...dotsToAdd].map((dot) => dot.id) };
     } else if (next) {
-      const { dotId: _, ...rest } = next;
+      const { dotIds: _, sequence: __, ...rest } = next;
       next = rest;
     }
-    // the dot only exists for the animation, so it goes along with it
-    const dotToRemove = next?.type !== "dot" ? currentDot : null;
+    const removeIds = new Set(dotsToRemove.map((dot) => dot.id));
 
-    // one update, so a single undo reverts both the line and its dot
     app.api.updateScene({
       elements: app.scene.getElementsIncludingDeleted().flatMap((el) => {
         if (el.id === line.id) {
-          const updated = newElementWith(el, {
-            customData: withElementAnimation(line, next),
-          });
-          return dotToAdd ? [updated, dotToAdd] : [updated];
+          return [
+            newElementWith(el, {
+              customData: withElementAnimation(line, next),
+            }),
+            ...dotsToAdd,
+          ];
         }
-        if (dotToRemove && el.id === dotToRemove.id) {
+        if (removeIds.has(el.id)) {
           return [newElementWith(el, { isDeleted: true })];
         }
         return [el];
@@ -346,10 +448,135 @@ export const AnimationMenu = () => {
     });
   };
 
+  const dotItems = items.filter(
+    (item) => item.animation?.type === "dot" && item.dots.length > 0,
+  );
+  const selectedDotItems = dotItems.filter(isSelected);
+  const sequencedItems = dotItems.filter((item) => item.animation?.sequence);
+  // selected lines if several are selected, else everything already sequenced
+  const sequenceTargets =
+    selectedDotItems.length > 1 ? selectedDotItems : sequencedItems;
+  const sequenceSteps = [
+    ...sequencedItems
+      .reduce((steps, item) => {
+        const step = item.animation!.sequence!;
+        steps.set(step, [...(steps.get(step) ?? []), item.label]);
+        return steps;
+      }, new Map<number, string[]>())
+      .entries(),
+  ].sort(([a], [b]) => a - b);
+
+  /** numbers the target lines 1, 2, 3, … by where their dots start */
+  const orderSequence = (order: "ltr" | "rtl" | "clear") => {
+    const elementsMap = app.scene.getNonDeletedElementsMap();
+    const lines = sequenceTargets
+      .map((item) => ({
+        line: item.element,
+        start: getTravelStart(item.element, elementsMap),
+      }))
+      .sort((a, b) =>
+        order === "rtl"
+          ? b.start[0] - a.start[0] || a.start[1] - b.start[1]
+          : a.start[0] - b.start[0] || a.start[1] - b.start[1],
+      );
+    const sequences = new Map(
+      lines.map(({ line }, i) => [line.id, order === "clear" ? 0 : i + 1]),
+    );
+    app.api.updateScene({
+      elements: app.scene.getElementsIncludingDeleted().map((el) => {
+        const sequence = sequences.get(el.id);
+        const animation = getElementAnimation(el);
+        if (sequence === undefined || !animation || !isAnimatableElement(el)) {
+          return el;
+        }
+        return newElementWith(el, {
+          customData: withElementAnimation(el, { ...animation, sequence }),
+        });
+      }),
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+  };
+
+  /** moves the line's label just clear of the line, or back onto it */
+  const setLabelSide = (item: Item, side: LabelSide) => {
+    const text = item.labelElement;
+    if (!text) {
+      return;
+    }
+    const line = item.element;
+    const elementsMap = app.scene.getNonDeletedElementsMap();
+    const pointAt = (pathParameter: number) =>
+      LinearElementEditor.getPointAtPathParameter(
+        line,
+        pathParameter,
+        elementsMap,
+      );
+    const offset =
+      side === "on"
+        ? 0
+        : getClearLabelOffset(text, side, line.strokeWidth, pointAt);
+    const { [LABEL_OFFSET_CUSTOM_DATA_KEY]: _, ...rest } =
+      text.customData ?? {};
+    const withOffset = newElementWith(text, {
+      customData: offset
+        ? { ...rest, [LABEL_OFFSET_CUSTOM_DATA_KEY]: offset }
+        : rest,
+    });
+    const { x, y } = LinearElementEditor.getBoundTextElementPosition(
+      line,
+      withOffset,
+      elementsMap,
+    );
+    app.api.updateScene({
+      elements: app.scene
+        .getElementsIncludingDeleted()
+        .map((el) => (el.id === text.id ? { ...withOffset, x, y } : el)),
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+  };
+
+  const setLabelFollowsPath = (item: Item, follows: boolean) => {
+    const text = item.labelElement;
+    if (!text) {
+      return;
+    }
+    const { [LABEL_FOLLOWS_PATH_CUSTOM_DATA_KEY]: _, ...rest } =
+      text.customData ?? {};
+    app.api.updateScene({
+      elements: app.scene.getElementsIncludingDeleted().map((el) =>
+        el.id === text.id
+          ? newElementWith(el, {
+              customData: follows
+                ? { ...rest, [LABEL_FOLLOWS_PATH_CUSTOM_DATA_KEY]: true }
+                : rest,
+            })
+          : el,
+      ),
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+  };
+
   const focusElement = (element: ExcalidrawElement) => {
     setAppState({ selectedElementIds: { [element.id]: true } });
     app.viewport.setViewport({
       target: getCommonBounds([element]),
+      fit: "scale-down",
+      animation: { duration: 300 },
+      offsets: { ui: true },
+    });
+  };
+
+  const selectElements = (elements: readonly ExcalidrawElement[]) => {
+    if (!elements.length) {
+      return;
+    }
+    setAppState({
+      selectedElementIds: Object.fromEntries(
+        elements.map((element) => [element.id, true as const]),
+      ),
+    });
+    app.viewport.setViewport({
+      target: getCommonBounds(elements),
       fit: "scale-down",
       animation: { duration: 300 },
       offsets: { ui: true },
@@ -383,6 +610,52 @@ export const AnimationMenu = () => {
             </button>
           ))}
         </div>
+        {sequenceTargets.length > 1 && (
+          <div className="animation-menu__sequence">
+            {sequenceSteps.length > 0 && (
+              <ol className="animation-menu__sequence-steps">
+                {sequenceSteps.map(([step, labels]) => (
+                  <li key={step}>
+                    <strong>{step}</strong> {labels.join(", ")}
+                  </li>
+                ))}
+              </ol>
+            )}
+            {sequenceSteps.some(([, labels]) => labels.length > 1) && (
+              <div className="animation-menu__hint">
+                {STRINGS.sequenceSharedHint}
+              </div>
+            )}
+            <div className="animation-menu__sequence-actions" role="group">
+              <span>
+                {selectedDotItems.length > 1
+                  ? STRINGS.sequenceOrderSelected
+                  : STRINGS.sequenceOrderAll}
+              </span>
+              <button
+                type="button"
+                className="animation-menu__secondary"
+                onClick={() => orderSequence("ltr")}
+              >
+                {STRINGS.sequenceLtr}
+              </button>
+              <button
+                type="button"
+                className="animation-menu__secondary"
+                onClick={() => orderSequence("rtl")}
+              >
+                {STRINGS.sequenceRtl}
+              </button>
+              <button
+                type="button"
+                className="animation-menu__secondary"
+                onClick={() => orderSequence("clear")}
+              >
+                {STRINGS.sequenceClear}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {visibleItems.length ? (
@@ -393,8 +666,14 @@ export const AnimationMenu = () => {
               item={item}
               selected={isSelected(item)}
               onFocus={() => focusElement(item.element)}
-              onSelectDot={() => item.dot && focusElement(item.dot)}
-              onChange={(animation) => updateAnimation(item.element, animation)}
+              onSelectDots={() => selectElements(item.dots)}
+              onLabelSide={(side) => setLabelSide(item, side)}
+              onLabelFollowsPath={(follows) =>
+                setLabelFollowsPath(item, follows)
+              }
+              onChange={(animation, dotCount) =>
+                updateAnimation(item.element, animation, dotCount)
+              }
             />
           ))}
         </ul>

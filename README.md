@@ -22,10 +22,12 @@ Excalidraw Animate is the Excalidraw editor with an **Animate** panel. Draw your
   | Flow | Marching dashes along the line, like data or traffic moving | direction, duration, dash, gap |
   | Draw | The line draws itself, the arrowheads appear when it's complete | direction, duration |
   | Pulse | The line fades in and out | duration |
-  | Moving dot | A dot travels along the line, like a packet or a request | direction, duration |
+  | Moving dots | One or more dots travel along the line, like packets or requests | direction, duration, number of dots, sequence |
 
 - **Directions:** forward, reverse, or alternate (back and forth). The default follows the arrowheads.
-- **The moving dot is a real canvas element.** Choosing _Moving dot_ adds a small circle to the drawing that you can recolor, resize and restyle like any other shape. Delete it and the animation is disabled; undo brings it back. It passes under the arrow's label like the line does.
+- **Moving dots are real canvas elements.** Choosing _Moving dots_ adds small circles to the drawing that you can recolor, resize and restyle like any other shape; new dots copy the style of the first one. Set how many dots travel on a line, they are spread evenly. Delete a dot and it drops out; delete all and the animation is disabled, undo brings them back. Dots pass under the arrow's label like the line does.
+- **Labels off the line or along the curve.** Move an arrow's label above or below the line, so the line and its dots stay fully visible, and let it follow the arrow's curve instead of sitting straight on it. Both are stored per label and ignored by regular Excalidraw, which shows the label as before.
+- **Sequenced dots.** Give lines a _sequence_ number to put them on one shared timeline: the same number moves them in sync, ascending numbers play one after another, so a dot seems to travel across a chain of arrows. Select several lines and use _Left → right_ / _Right → left_ to number them by position.
 - **Hover reveal.** Optionally hide all text, or only the labels of animated arrows, until the pointer is over the diagram. Busy diagrams stay clean, details appear on demand.
 - **Stays editable.** Animation settings are stored in the scene (`customData`), so they are saved in `.excalidraw` files, in exported `.excalidraw.svg` files with an embedded scene, in undo history, and in live collaboration. Re-open the file, change the drawing, export again.
 - **Everything else is still Excalidraw:** hand-drawn style, libraries, collaboration, dark mode, PNG export.

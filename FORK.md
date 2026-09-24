@@ -11,7 +11,7 @@ The **Animate** button (top right, in place of the Excalidraw+ banner) opens the
 | Flow | marching dashes along the line | direction, duration, dash, gap |
 | Draw | line draws itself, arrowheads fade in at the end | direction, duration |
 | Pulse | line opacity pulses | duration |
-| Moving dot | a real canvas element (default: small filled circle, style it freely) travels along the line; deleting it disables the animation | direction, duration |
+| Moving dots | one or more real canvas elements (default: small filled circles, style them freely) travel along the line; sequence numbers put lines on a shared timeline (same number: in sync, ascending: one after another) | direction, duration, dots, sequence |
 
 Direction is relative to the element's points: `forward` = start → end.
 
@@ -27,9 +27,11 @@ All feature code lives in new files under `packages/excalidraw/animation/` (new 
 
 | File | Hook |
 | --- | --- |
-| `packages/excalidraw/renderer/staticSvgScene.ts` | `applyElementAnimation` (lines/arrows), `applyAnimationDotMotion` (shapes), `markTextNode` (text) |
+| `packages/excalidraw/renderer/staticSvgScene.ts` | `applyElementAnimation` and the curved label gap (lines/arrows), `applyAnimationDotMotion` (shapes), `markTextNode` and `renderCurvedLabelSvg` (text) |
 | `excalidraw-app/App.tsx` | `<AnimationSidebarTrigger />` replaces the Excalidraw+ banner, `<AnimationSidebar />` next to `<AppSidebar />`, `onDuplicate={remapAnimationReferences}` |
 | `excalidraw-app/App.tsx` | URL resets keep the path (`window.location.pathname` instead of `.origin`) so the app works under a sub path; `#url=` scenes scroll to content |
+| `packages/element/src/linearElementEditor.ts` | `applyLabelOffset(...)` in `getBoundTextElementPosition`: label offset above/below the line (`packages/element/src/labelOffset.ts`, stored in the label's `customData.labelOffset`) |
+| `packages/element/src/renderElement.ts` | `drawCurvedLabel(...)` at the start of `drawElement`, `traceCurvedLabelHole(...)` in both label-gap clips (logic in `packages/element/src/curvedLabel.ts`, opt-in via the label's `customData.labelFollowsPath`) |
 | `excalidraw-app/collab/Collab.tsx` | same path-preserving URL reset when leaving a session |
 | `excalidraw-app/index.html` | `VITE_APP_DISABLE_ANALYTICS=true` skips excalidraw.com's analytics script |
 
@@ -69,3 +71,5 @@ cd excalidraw-app
 VITE_APP_DISABLE_SENTRY=true VITE_APP_DISABLE_ANALYTICS=true yarn vite build --base=/excalidraw-animate/
 yarn vite preview --base=/excalidraw-animate/
 ```
+
+Delete `excalidraw-app/build/` afterwards if the dev server (`yarn start`) is running: its lint checker scans that folder and crashes when a rebuild replaces the files.

@@ -18,7 +18,7 @@ import { fireEvent, render, screen, waitFor } from "../tests/test-utils";
 import { ANIMATION_SIDEBAR_NAME, AnimationSidebar } from "./AnimationSidebar";
 import {
   ANIMATION_DOT_CUSTOM_DATA_KEY,
-  getAnimationDot,
+  getAnimationDots,
   remapAnimationReferences,
 } from "./dot";
 import { ANIMATION_CUSTOM_DATA_KEY, getElementAnimation } from "./types";
@@ -161,9 +161,9 @@ describe("remapAnimationReferences", () => {
   it("links copied pairs to each other", () => {
     const result = duplicate(createPair(), { arrow1: "arrow2", dot1: "dot2" })!;
     const elementsMap = new Map(result.map((el) => [el.id, el]));
-    expect(getAnimationDot(elementsMap.get("arrow2")!, elementsMap)?.id).toBe(
-      "dot2",
-    );
+    expect(
+      getAnimationDots(elementsMap.get("arrow2")!, elementsMap)[0]?.id,
+    ).toBe("dot2");
   });
 
   it("leaves a line copied without its dot disabled", () => {
@@ -174,7 +174,9 @@ describe("remapAnimationReferences", () => {
       [dot.id, dot],
       ["arrow2", { ...arrow, id: "arrow2" }],
     ]);
-    expect(getAnimationDot(elementsMap.get("arrow2")!, elementsMap)).toBe(null);
+    expect(getAnimationDots(elementsMap.get("arrow2")!, elementsMap)).toEqual(
+      [],
+    );
   });
 });
 
@@ -224,7 +226,7 @@ describe("moving dot sidebar", () => {
     });
     expect(dot.x + dot.width / 2).toBe(100);
     expect(dot.y + dot.height / 2).toBe(50);
-    expect(getElementAnimation(arrow())?.dotId).toBe(dot.id);
+    expect(getElementAnimation(arrow())?.dotIds).toEqual([dot.id]);
 
     fireEvent.click(screen.getByText("Select dot to style it"));
     await waitFor(() =>
@@ -240,7 +242,7 @@ describe("moving dot sidebar", () => {
     fireEvent.change(typeSelect(), { target: { value: "flow" } });
     await waitFor(() => expect(dots()).toHaveLength(0));
     expect(getElementAnimation(arrow())).toMatchObject({ type: "flow" });
-    expect(getElementAnimation(arrow())?.dotId).toBeUndefined();
+    expect(getElementAnimation(arrow())?.dotIds).toBeUndefined();
 
     API.executeAction(createUndoAction(h.history));
     await waitFor(() => expect(dots()).toHaveLength(1));
@@ -264,7 +266,7 @@ describe("moving dot sidebar", () => {
 
     fireEvent.click(screen.getByText("Add dot"));
     await waitFor(() => expect(dots()).toHaveLength(1));
-    expect(getElementAnimation(arrow())?.dotId).toBe(dots()[0].id);
+    expect(getElementAnimation(arrow())?.dotIds).toEqual([dots()[0].id]);
     expect(screen.getByText("1 line · 1 animated")).toBeInTheDocument();
   });
 });

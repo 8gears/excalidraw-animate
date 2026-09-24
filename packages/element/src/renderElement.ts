@@ -46,6 +46,8 @@ import type {
   InteractiveCanvasRenderConfig,
 } from "@excalidraw/excalidraw/scene/types";
 
+// [excalidraw-animate] hook
+import { drawCurvedLabel, traceCurvedLabelHole } from "./curvedLabel";
 import { getElementAbsoluteCoords, getElementBounds } from "./bounds";
 import { getUncroppedImageElement } from "./cropElement";
 import { LinearElementEditor } from "./linearElementEditor";
@@ -798,22 +800,35 @@ const drawElementFromCanvas = (
       padding * 10;
     context.beginPath();
     context.rect(cx - outerHalf, cy - outerHalf, outerHalf * 2, outerHalf * 2);
-    context.rect(
-      (boundTextCx -
-        boundTextElement.width / 2 -
-        BOUND_TEXT_PADDING +
-        positionOffset.x +
-        appState.scrollX) *
-        devicePixelRatio,
-      (boundTextCy -
-        boundTextElement.height / 2 -
-        BOUND_TEXT_PADDING +
-        positionOffset.y +
-        appState.scrollY) *
-        devicePixelRatio,
-      (boundTextElement.width + BOUND_TEXT_PADDING * 2) * devicePixelRatio,
-      (boundTextElement.height + BOUND_TEXT_PADDING * 2) * devicePixelRatio,
+    // [excalidraw-animate] hook: a curved label's gap follows the line
+    const isCurvedLabel = traceCurvedLabelHole(
+      context,
+      boundTextElement,
+      allElementsMap,
+      LinearElementEditor.getPointAtPathParameter,
+      (x, y) => [
+        (x + positionOffset.x + appState.scrollX) * devicePixelRatio,
+        (y + positionOffset.y + appState.scrollY) * devicePixelRatio,
+      ],
     );
+    if (!isCurvedLabel) {
+      context.rect(
+        (boundTextCx -
+          boundTextElement.width / 2 -
+          BOUND_TEXT_PADDING +
+          positionOffset.x +
+          appState.scrollX) *
+          devicePixelRatio,
+        (boundTextCy -
+          boundTextElement.height / 2 -
+          BOUND_TEXT_PADDING +
+          positionOffset.y +
+          appState.scrollY) *
+          devicePixelRatio,
+        (boundTextElement.width + BOUND_TEXT_PADDING * 2) * devicePixelRatio,
+        (boundTextElement.height + BOUND_TEXT_PADDING * 2) * devicePixelRatio,
+      );
+    }
     context.clip("evenodd");
   }
 
@@ -1018,6 +1033,27 @@ const drawElement = (
   appState: StaticCanvasAppState | InteractiveCanvasAppState,
   renderState: ElementRenderState,
 ) => {
+  // [excalidraw-animate] hook: labels following their line, drawn as vectors
+  if (
+    isTextElement(element) &&
+    drawCurvedLabel(
+      element,
+      allElementsMap,
+      LinearElementEditor.getPointAtPathParameter,
+      context,
+      renderConfig.theme === THEME.DARK,
+      {
+        x:
+          appState.scrollX +
+          (renderConfig.isExporting ? 0 : renderState.offset.x),
+        y:
+          appState.scrollY +
+          (renderConfig.isExporting ? 0 : renderState.offset.y),
+      },
+    )
+  ) {
+    return;
+  }
   switch (element.type) {
     case "magicframe":
     case "frame": {
@@ -1169,7 +1205,18 @@ const drawElement = (
           context.save();
           context.beginPath();
           context.rect(-outerHalf, -outerHalf, outerHalf * 2, outerHalf * 2);
-          context.rect(holeX, holeY, holeWidth, holeHeight);
+          // [excalidraw-animate] hook: a curved label's gap follows the line
+          if (
+            !traceCurvedLabelHole(
+              context,
+              boundTextElement,
+              elementsMap,
+              LinearElementEditor.getPointAtPathParameter,
+              (x, y) => [x - centerX, y - centerY],
+            )
+          ) {
+            context.rect(holeX, holeY, holeWidth, holeHeight);
+          }
           context.clip("evenodd");
           context.rotate(element.angle);
           context.translate(-shiftX, -shiftY);

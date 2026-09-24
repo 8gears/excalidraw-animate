@@ -6,7 +6,7 @@ import type {
   ExcalidrawTextElement,
 } from "@excalidraw/element/types";
 
-import { getAnimationDot, isLineAnimated } from "./dot";
+import { getAnimationDots, isLineAnimated } from "./dot";
 import { getDotMaskId } from "./svg";
 import { isAnimatableElement } from "./types";
 
@@ -70,8 +70,8 @@ export const applyHoverReveal = (
   // a label cuts a gap into its line (via a mask), close it while hidden
   const masks = getHiddenLabelLines(mode, elements, elementsMap)
     .flatMap((line) => {
-      const dot = getAnimationDot(line, elementsMap);
-      return [`mask-${line.id}`, ...(dot ? [getDotMaskId(dot.id)] : [])];
+      const dots = getAnimationDots(line, elementsMap);
+      return [`mask-${line.id}`, ...dots.map((dot) => getDotMaskId(dot.id))];
     })
     .filter((id) => svg.querySelector(`[mask="url(#${id})"]`))
     .map((id) => `[mask="url(#${id})"]`);

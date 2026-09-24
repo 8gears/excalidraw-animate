@@ -32,8 +32,22 @@ export const STRINGS = {
   line: "Line",
   focus: "Select on canvas",
   selectDot: "Select dot to style it",
+  selectDots: "Select dots to style them",
+  dotCount: "Dots",
+  sequence: "Sequence step (0 = own timing)",
+  sequenceOrderSelected: "Order selected:",
+  sequenceOrderAll: "Order sequence:",
+  sequenceSharedHint:
+    "Lines in the same step move together. Order them to play one after another.",
+  sequenceLtr: "Left → right",
+  sequenceRtl: "Right → left",
+  sequenceClear: "Clear",
   dotMissing: "No dot on the canvas, animation disabled.",
   addDot: "Add dot",
+  labelPlacement: "Label",
+  moreOptions: "More options",
+  labelSides: { above: "Above", on: "On line", below: "Below" },
+  labelFollowsPath: "Follow curve",
   summary: (total: number, animated: number) =>
     `${total} line${total === 1 ? "" : "s"} · ${animated} animated`,
 } as const;
@@ -43,7 +57,7 @@ export const TYPE_LABELS: Record<ElementAnimationType | "none", string> = {
   flow: "Flow (dashes)",
   draw: "Draw",
   pulse: "Pulse",
-  dot: "Moving dot",
+  dot: "Moving dots",
 };
 
 export const HOVER_REVEAL_LABELS: Record<HoverRevealMode, string> = {

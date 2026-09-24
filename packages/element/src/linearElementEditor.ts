@@ -54,6 +54,8 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { Bounds } from "@excalidraw/common";
 
+// [excalidraw-animate] hook
+import { applyLabelOffset } from "./labelOffset";
 import {
   calculateFixedPointForNonElbowArrowBinding,
   getBindingStrategyForDraggingBindingElementEndpoints,
@@ -2081,10 +2083,20 @@ export class LinearElementEditor {
       return cached.position;
     }
 
-    const position = LinearElementEditor.computeBoundTextElementPosition(
-      element,
+    // [excalidraw-animate] hook: label offset above/below the line
+    const position = applyLabelOffset(
       boundTextElement,
-      elementsMap,
+      LinearElementEditor.computeBoundTextElementPosition(
+        element,
+        boundTextElement,
+        elementsMap,
+      ),
+      (pathParameter) =>
+        LinearElementEditor.getPointAtPathParameter(
+          element,
+          pathParameter,
+          elementsMap,
+        ),
     );
 
     BoundTextPositionCache.set(boundTextElement, {

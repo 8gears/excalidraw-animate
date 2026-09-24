@@ -165,6 +165,29 @@ describe("AnimationMenu", () => {
     );
     expect(getItem("Line 1")).toBeTruthy();
   });
+
+  it("collapses sequence and label settings under More options", async () => {
+    await waitFor(() => expect(getItem("Pull image")).toBeTruthy());
+    fireEvent.change(getItem("Pull image").querySelector("select")!, {
+      target: { value: "dot" },
+    });
+    const details = await waitFor(() => {
+      const node = getItem("Pull image").querySelector("details")!;
+      expect(node).toBeTruthy();
+      return node;
+    });
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")!.textContent).toBe("More options");
+    expect(details.textContent).toContain("Sequence step");
+    expect(details.textContent).toContain("Follow curve");
+    // primary settings stay outside
+    expect(
+      getItem("Pull image").querySelector("details")!.textContent,
+    ).not.toContain("Duration");
+
+    fireEvent.click(details.querySelector("summary")!);
+    expect(details.open).toBe(true);
+  });
 });
 
 describe("AnimationSidebarTrigger", () => {

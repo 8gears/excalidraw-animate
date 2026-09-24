@@ -1,4 +1,5 @@
 import { BOUND_TEXT_PADDING } from "@excalidraw/common";
+import { getCurvedLabelHolePathData } from "@excalidraw/element/curvedLabel";
 import {
   getBoundTextElement,
   isElbowArrow,
@@ -7,8 +8,16 @@ import {
 
 import type { ElementsMap, ExcalidrawElement } from "@excalidraw/element/types";
 
-import { getDotAnimationSource, isAnimationDotCandidate } from "./dot";
+import {
+  getDotAnimationSource,
+  getDotCycleDuration,
+  getSequenceSchedule,
+  isAnimationDotCandidate,
+} from "./dot";
+
 import { getElementAnimation } from "./types";
+
+import type { DotAnimationSource } from "./dot";
 
 import type { Drawable } from "roughjs/bin/core";
 import type { RoughSVG } from "roughjs/bin/svg";
@@ -267,6 +276,59 @@ export const applyElementAnimation = (
   }
 };
 
+/**
+ * Timing of one dot: its own looping cycle, or its window within the shared
+ * timeline of sequenced lines (hidden outside of it). Several dots on a line
+ * are spread evenly by phase-shifting them with a negative `begin`, so they
+ * are in place from the first frame.
+ */
+const getDotTiming = (
+  { line, animation, index, count }: DotAnimationSource,
+  elementsMap: ElementsMap,
+) => {
+  const cycle = getDotCycleDuration(animation);
+  const schedule = animation.sequence ? getSequenceSchedule(elementsMap) : null;
+  const start = schedule?.starts.get(line.id);
+  const total = start !== undefined ? schedule!.total : cycle;
+
+  // fractions of `total` where this line's cycle starts and ends
+  const from = start !== undefined ? start / total : 0;
+  const to = start !== undefined ? (start + cycle) / total : 1;
+  const sequenced = start !== undefined;
+  const alternate = animation.direction === "alternate";
+  const travel = alternate
+    ? ["0", "1", "0"]
+    : animation.direction === "forward"
+    ? ["0", "1"]
+    : ["1", "0"];
+  // sequenced: hold the start point before this line's turn, the end after
+  const points = sequenced
+    ? [travel[0], ...travel, travel[travel.length - 1]]
+    : travel;
+  const times = sequenced
+    ? alternate
+      ? [0, from, (from + to) / 2, to, 1]
+      : [0, from, to, 1]
+    : alternate
+    ? [0, 0.5, 1]
+    : [0, 1];
+
+  const delay = (index * cycle) / count;
+  return {
+    keyPoints: points.join(";"),
+    keyTimes: times.map(num).join(";"),
+    dur: `${num(total)}ms`,
+    begin: (delay ? { begin: `${num(delay - total)}ms` } : {}) as Record<
+      string,
+      string
+    >,
+    visibility:
+      sequenced && (from > 0 || to < 1)
+        ? [0, from, to].map(num).join(";")
+        : null,
+  };
+};
+
 export const getDotMaskId = (dotId: string) => `animation-dot-mask-${dotId}`;
 
 /**
@@ -297,7 +359,7 @@ export const applyAnimationDotMotion = (
   if (!source) {
     return;
   }
-  const { line, animation } = source;
+  const { line } = source;
   const doc = node.ownerDocument;
 
   // the node is rotated around the dot center, so its local frame is too
@@ -320,18 +382,7 @@ export const applyAnimationDotMotion = (
     return [dx * cos - dy * sin, dx * sin + dy * cos] as const;
   });
 
-  const motion: Record<string, string> =
-    animation.direction === "alternate"
-      ? {
-          keyPoints: "0;1;0",
-          keyTimes: "0;0.5;1",
-          dur: `${num(animation.duration * 2)}ms`,
-        }
-      : {
-          keyPoints: animation.direction === "forward" ? "0;1" : "1;0",
-          keyTimes: "0;1",
-          dur: `${num(animation.duration)}ms`,
-        };
+  const timing = getDotTiming(source, elementsMap);
 
   const moving = doc.createElementNS(SVG_NS, "g");
   while (node.firstChild) {
@@ -341,9 +392,24 @@ export const applyAnimationDotMotion = (
     createAnimationNode(doc, "animateMotion", {
       path: getCenterlinePath(rsvg, line, points),
       calcMode: "linear",
-      ...motion,
+      keyPoints: timing.keyPoints,
+      keyTimes: timing.keyTimes,
+      dur: timing.dur,
+      ...timing.begin,
     }),
   );
+  if (timing.visibility) {
+    moving.appendChild(
+      createAnimationNode(doc, "animate", {
+        attributeName: "opacity",
+        calcMode: "discrete",
+        values: "0;1;0",
+        keyTimes: timing.visibility,
+        dur: timing.dur,
+        ...timing.begin,
+      }),
+    );
+  }
 
   // same hole the line gets around its label, so the dot passes under it
   const label = getBoundTextElement(line, elementsMap);
@@ -371,11 +437,23 @@ export const applyAnimationDotMotion = (
 
     // hole in export coordinates, mapped into the node's local frame by
     // undoing the node's transform
-    const hole = doc.createElementNS(SVG_NS, "rect");
-    hole.setAttribute("x", num(x - element.x + offsetX - BOUND_TEXT_PADDING));
-    hole.setAttribute("y", num(y - element.y + offsetY - BOUND_TEXT_PADDING));
-    hole.setAttribute("width", num(label.width + BOUND_TEXT_PADDING * 2));
-    hole.setAttribute("height", num(label.height + BOUND_TEXT_PADDING * 2));
+    // curved labels cut a band along the line instead of a box
+    const curvedHole = getCurvedLabelHolePathData(
+      label,
+      elementsMap,
+      LinearElementEditor.getPointAtPathParameter,
+      offsetX - element.x,
+      offsetY - element.y,
+    );
+    const hole = doc.createElementNS(SVG_NS, curvedHole ? "path" : "rect");
+    if (curvedHole) {
+      hole.setAttribute("d", curvedHole);
+    } else {
+      hole.setAttribute("x", num(x - element.x + offsetX - BOUND_TEXT_PADDING));
+      hole.setAttribute("y", num(y - element.y + offsetY - BOUND_TEXT_PADDING));
+      hole.setAttribute("width", num(label.width + BOUND_TEXT_PADDING * 2));
+      hole.setAttribute("height", num(label.height + BOUND_TEXT_PADDING * 2));
+    }
     hole.setAttribute("fill", "#000");
     hole.setAttribute(
       "transform",

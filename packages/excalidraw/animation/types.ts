@@ -28,8 +28,14 @@ export type ElementAnimation = {
   dashLength: number;
   /** used by `flow` */
   gapLength: number;
-  /** used by `dot`: id of the canvas element that moves along the line */
-  dotId?: string;
+  /** used by `dot`: ids of the canvas elements that move along the line */
+  dotIds?: string[];
+  /**
+   * used by `dot`: lines with a sequence (>= 1) share one timeline. Same
+   * number: in sync; ascending numbers: one after another, so a dot looks
+   * like it travels across them. 0/undefined: independent.
+   */
+  sequence?: number;
 };
 
 export type AnimatableElement = ExcalidrawArrowElement | ExcalidrawLineElement;
@@ -38,6 +44,8 @@ export const ANIMATION_LIMITS = {
   duration: { min: 100, max: 20000, step: 100 },
   dashLength: { min: 1, max: 200, step: 1 },
   gapLength: { min: 1, max: 200, step: 1 },
+  dotCount: { min: 1, max: 10, step: 1 },
+  sequence: { min: 0, max: 99, step: 1 },
 } as const;
 
 const DEFAULT_DURATION: Record<ElementAnimationType, number> = {
@@ -86,9 +94,21 @@ export const getElementAnimation = (
       clamp(raw.dashLength, ANIMATION_LIMITS.dashLength) ?? defaults.dashLength,
     gapLength:
       clamp(raw.gapLength, ANIMATION_LIMITS.gapLength) ?? defaults.gapLength,
-    ...(raw.type === "dot" && typeof raw.dotId === "string"
-      ? { dotId: raw.dotId }
-      : {}),
+    ...(raw.type === "dot" ? getDotFields(raw) : {}),
+  };
+};
+
+const getDotFields = (raw: Record<string, unknown>) => {
+  const dotIds = Array.isArray(raw.dotIds)
+    ? raw.dotIds.filter((id): id is string => typeof id === "string")
+    : // single-dot configs before `dotIds` existed
+    typeof raw.dotId === "string"
+    ? [raw.dotId]
+    : [];
+  const sequence = clamp(raw.sequence, ANIMATION_LIMITS.sequence);
+  return {
+    dotIds,
+    ...(sequence ? { sequence: Math.round(sequence) } : {}),
   };
 };
 

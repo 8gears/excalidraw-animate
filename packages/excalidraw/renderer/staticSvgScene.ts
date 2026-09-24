@@ -46,6 +46,11 @@ import {
 
 import { getElementAbsoluteCoords } from "@excalidraw/element";
 
+import {
+  getCurvedLabelHolePathData,
+  renderCurvedLabelSvg,
+} from "@excalidraw/element/curvedLabel";
+
 import type {
   ExcalidrawElement,
   ExcalidrawTextElementWithContainer,
@@ -53,6 +58,7 @@ import type {
 } from "@excalidraw/element/types";
 
 // [excalidraw-animate] hook
+
 import { markTextNode } from "../animation/hoverReveal";
 import {
   applyAnimationDotMotion,
@@ -514,6 +520,25 @@ const renderElementToSvg = (
       });
       // [excalidraw-animate] hook
       applyElementAnimation(rsvg, element, shapes, group);
+      if (boundText) {
+        const holePath = getCurvedLabelHolePathData(
+          boundText,
+          elementsMap,
+          LinearElementEditor.getPointAtPathParameter,
+          (offsetX || 0) - element.x,
+          (offsetY || 0) - element.y,
+        );
+        const hole = holePath && maskPath.querySelector("rect[fill='#000']");
+        if (hole) {
+          const curvedHole = svgRoot.ownerDocument.createElementNS(
+            SVG_NS,
+            "path",
+          );
+          curvedHole.setAttribute("d", holePath);
+          curvedHole.setAttribute("fill", "#000");
+          hole.replaceWith(curvedHole);
+        }
+      }
 
       const g = maybeWrapNodesInFrameClipPath(
         element,
@@ -849,6 +874,22 @@ const renderElementToSvg = (
         }
         // [excalidraw-animate] hook
         markTextNode(element, node, elementsMap);
+        const container = getContainerElement(element, elementsMap);
+        if (isArrowElement(container)) {
+          const box = LinearElementEditor.getBoundTextElementPosition(
+            container,
+            element as ExcalidrawTextElementWithContainer,
+            elementsMap,
+          );
+          renderCurvedLabelSvg(
+            element,
+            node,
+            elementsMap,
+            LinearElementEditor.getPointAtPathParameter,
+            offsetX - box.x,
+            offsetY - box.y,
+          );
+        }
 
         const g = maybeWrapNodesInFrameClipPath(
           element,
