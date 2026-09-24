@@ -214,7 +214,10 @@
     </header>
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
-    <% if (typeof PROD != 'undefined' && PROD == true) { %>
+    <!-- [excalidraw-animate] hook: VITE_APP_DISABLE_ANALYTICS -->
+    <% if (typeof PROD != 'undefined' && PROD == true && !(typeof
+    VITE_APP_DISABLE_ANALYTICS != 'undefined' && VITE_APP_DISABLE_ANALYTICS ==
+    'true')) { %>
     <!-- 100% privacy friendly analytics -->
     <script>
       // need to load this script dynamically bcs. of iframe embed tracking

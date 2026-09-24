@@ -52,6 +52,13 @@ import type {
   NonDeletedExcalidrawElement,
 } from "@excalidraw/element/types";
 
+// [excalidraw-animate] hook
+import { markTextNode } from "../animation/hoverReveal";
+import {
+  applyAnimationDotMotion,
+  applyElementAnimation,
+} from "../animation/svg";
+
 import type { RenderableElementsMap, SVGRenderConfig } from "../scene/types";
 import type { AppState, BinaryFiles } from "../types";
 import type { Drawable } from "roughjs/bin/core";
@@ -288,6 +295,15 @@ const renderElementToSvg = (
           offsetY || 0
         }) rotate(${degree} ${cx} ${cy})`,
       );
+      // [excalidraw-animate] hook
+      applyAnimationDotMotion(
+        rsvg,
+        element,
+        node,
+        elementsMap,
+        offsetX || 0,
+        offsetY || 0,
+      );
 
       const g = maybeWrapNodesInFrameClipPath(
         element,
@@ -496,6 +512,8 @@ const renderElementToSvg = (
         }
         group.appendChild(node);
       });
+      // [excalidraw-animate] hook
+      applyElementAnimation(rsvg, element, shapes, group);
 
       const g = maybeWrapNodesInFrameClipPath(
         element,
@@ -829,6 +847,8 @@ const renderElementToSvg = (
           text.setAttribute("dominant-baseline", "alphabetic");
           node.appendChild(text);
         }
+        // [excalidraw-animate] hook
+        markTextNode(element, node, elementsMap);
 
         const g = maybeWrapNodesInFrameClipPath(
           element,

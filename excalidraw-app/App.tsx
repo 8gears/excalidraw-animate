@@ -10,6 +10,12 @@ import {
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
+// [excalidraw-animate] hook
+import {
+  AnimationSidebar,
+  AnimationSidebarTrigger,
+} from "@excalidraw/excalidraw/animation/AnimationSidebar";
+import { remapAnimationReferences } from "@excalidraw/excalidraw/animation/dot";
 import {
   CommandPalette,
   DEFAULT_CATEGORIES,
@@ -146,7 +152,6 @@ import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 
 import "./index.scss";
 
-import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanner";
 import { AppSidebar } from "./components/AppSidebar";
 
 import type { CollabAPI } from "./collab/Collab";
@@ -282,7 +287,7 @@ const initializeScene = async (opts: {
       }
       scene.scrollToContent = true;
       if (!roomLinkData) {
-        window.history.replaceState({}, APP_NAME, window.location.origin);
+        window.history.replaceState({}, APP_NAME, window.location.pathname);
       }
     } else {
       // https://github.com/excalidraw/excalidraw/issues/1919
@@ -299,10 +304,10 @@ const initializeScene = async (opts: {
       }
 
       roomLinkData = null;
-      window.history.replaceState({}, APP_NAME, window.location.origin);
+      window.history.replaceState({}, APP_NAME, window.location.pathname);
     }
   } else if (externalUrlMatch) {
-    window.history.replaceState({}, APP_NAME, window.location.origin);
+    window.history.replaceState({}, APP_NAME, window.location.pathname);
 
     const url = externalUrlMatch[1];
     try {
@@ -312,7 +317,8 @@ const initializeScene = async (opts: {
         !scene.elements.length ||
         (await openConfirmModal(shareableLinkConfirmDialog))
       ) {
-        return { scene: data, isExternalScene };
+        // [excalidraw-animate] like shared links, show the loaded drawing
+        return { scene: { ...data, scrollToContent: true }, isExternalScene };
       }
     } catch (error: any) {
       return {
@@ -994,16 +1000,14 @@ const ExcalidrawWrapper = () => {
         onThemeChange={setAppTheme}
         renderTopRightUI={(isMobile) => {
           if (isMobile || !collabAPI || isCollabDisabled) {
-            return null;
+            // [excalidraw-animate] hook
+            return isMobile ? null : <AnimationSidebarTrigger />;
           }
 
           return (
             <div className="excalidraw-ui-top-right">
-              {excalidrawAPI?.getEditorInterface().formFactor === "desktop" && (
-                <ExcalidrawPlusPromoBanner
-                  isSignedIn={isExcalidrawPlusSignedUser}
-                />
-              )}
+              {/* [excalidraw-animate] hook: replaces the Excalidraw+ banner */}
+              <AnimationSidebarTrigger />
 
               {collabError.message && <CollabError collabError={collabError} />}
               <LiveCollaborationTrigger
@@ -1016,6 +1020,8 @@ const ExcalidrawWrapper = () => {
             </div>
           );
         }}
+        // [excalidraw-animate] hook
+        onDuplicate={remapAnimationReferences}
         onLinkOpen={(element, event) => {
           if (element.link && isElementLink(element.link)) {
             event.preventDefault();
@@ -1101,6 +1107,8 @@ const ExcalidrawWrapper = () => {
         />
 
         <AppSidebar />
+        {/* [excalidraw-animate] hook */}
+        <AnimationSidebar />
 
         {errorMessage && (
           <ErrorDialog onClose={() => setErrorMessage("")}>

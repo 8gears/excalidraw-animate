@@ -389,7 +389,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       // that could have been saved in other tabs while we were collaborating
       resetBrowserStateVersions();
 
-      window.history.pushState({}, APP_NAME, window.location.origin);
+      window.history.pushState({}, APP_NAME, window.location.pathname);
       this.destroySocketClient();
 
       LocalData.fileStorage.reset();
