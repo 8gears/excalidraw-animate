@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Excalidraw Animate examples</title>
+    <meta
+      name="description"
+      content="Animated Excalidraw diagrams exported as pure SVG: flowing dashes, drawing lines, pulsing and moving dots, labels revealed on hover."
+    />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #1e1e1e;
+        --muted: #5c5f66;
+        --card: #f8f9fa;
+        --border: #dee2e6;
+        --accent: #6965db;
+        --accent-fg: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #121212;
+          --fg: #e3e3e8;
+          --muted: #a0a3ab;
+          --card: #1d1d20;
+          --border: #34343a;
+          --accent: #a8a5ff;
+          --accent-fg: #121212;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 16px 64px;
+      }
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 0.25rem;
+      }
+      h2 {
+        margin: 2.5rem 0 0.5rem;
+      }
+      p {
+        margin: 0.5rem 0;
+      }
+      .lead {
+        color: var(--muted);
+        font-size: 1.1rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin: 1.25rem 0 0;
+      }
+      .button {
+        display: inline-block;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .button.primary {
+        background: var(--accent);
+        color: var(--accent-fg);
+      }
+      figure {
+        margin: 1rem 0 0;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        /* diagrams are exported on a white background */
+        background: #ffffff;
+      }
+      figure object {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      figcaption {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+      ul.features {
+        padding-left: 1.2rem;
+      }
+      code {
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Excalidraw Animate</h1>
+      <p class="lead">
+        Animate the arrows and lines of an Excalidraw sketch and export it as a
+        pure SVG animation. No JavaScript, no video, no runtime library.
+      </p>
+      <div class="actions">
+        <a class="button primary" href="../">Open the editor</a>
+        <a class="button" id="open-satellite" href="../"
+          >Open the Harbor Satellite example in the editor</a
+        >
+        <a class="button" href="https://github.com/8gears/excalidraw-animate"
+          >Source on GitHub</a
+        >
+      </div>
+
+      <figure>
+        <img
+          src="editor-screenshot.png"
+          alt="The editor with the Animations sidebar: every arrow gets an animation type, direction and duration"
+          style="display: block; width: 100%; height: auto"
+        />
+        <figcaption>
+          The Animations sidebar lists every arrow and line of the drawing.
+        </figcaption>
+      </figure>
+
+      <h2>Harbor Satellite</h2>
+      <p>
+        Flowing dashes, a line drawing itself, pulsing and moving dots. The
+        labels of the animated arrows appear when you hover the image ("Hover
+        reveal"). This file also embeds the scene, so the editor can open it and
+        you can change the animations.
+      </p>
+      <figure>
+        <object
+          type="image/svg+xml"
+          data="harbor-satellite.excalidraw.svg"
+          aria-label="Animated Harbor Satellite architecture diagram"
+        ></object>
+        <figcaption>
+          <a href="harbor-satellite.excalidraw.svg" download
+            >harbor-satellite.excalidraw.svg</a
+          >
+          · hover the diagram to reveal the labels
+        </figcaption>
+      </figure>
+
+      <h2>Workload Identity Federation with 8gears Container Registry</h2>
+      <p>
+        A sequence diagram where each request is animated. Hover to reveal the
+        labels of the animated arrows.
+      </p>
+      <figure>
+        <object
+          type="image/svg+xml"
+          data="workload-identity-federation.svg"
+          aria-label="Animated Workload Identity Federation sequence diagram"
+        ></object>
+        <figcaption>
+          <a href="workload-identity-federation.svg" download
+            >workload-identity-federation.svg</a
+          >
+          · hover the diagram to reveal the labels
+        </figcaption>
+      </figure>
+
+      <h2>Try it yourself</h2>
+      <ul class="features">
+        <li>
+          Open the editor and click <strong>Animate</strong> (top right). The
+          sidebar lists every arrow and line.
+        </li>
+        <li>
+          Pick an animation per line: <em>Flow</em>, <em>Draw</em>,
+          <em>Pulse</em> or <em>Moving dot</em>, then its direction and speed.
+        </li>
+        <li>
+          <strong>Preview &amp; export</strong> downloads the animated SVG. Use
+          it in an <code>&lt;img&gt;</code> tag, a README, or embed it with
+          <code>&lt;object&gt;</code> to keep hover effects.
+        </li>
+      </ul>
+    </main>
+    <script>
+      // #url= makes the editor load a scene from a URL; it needs an absolute one
+      const scene = new URL("harbor-satellite.excalidraw.svg", location.href);
+      document.getElementById("open-satellite").href =
+        new URL("../", location.href).href +
+        "#url=" +
+        encodeURIComponent(scene.href);
+    </script>
+  </body>
+</html>
